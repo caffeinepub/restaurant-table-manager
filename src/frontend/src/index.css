@@ -1,0 +1,112 @@
+@font-face {
+  font-family: "Playfair Display";
+  font-style: normal;
+  font-weight: 400 800;
+  font-display: swap;
+  src: url("/assets/fonts/PlayfairDisplay.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Figtree";
+  font-style: normal;
+  font-weight: 300 900;
+  font-display: swap;
+  src: url("/assets/fonts/Figtree.woff2") format("woff2");
+}
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0.96 0.012 70;
+    --foreground: 0.18 0.03 30;
+    --card: 0.98 0.008 65;
+    --card-foreground: 0.18 0.03 30;
+    --popover: 0.98 0.008 65;
+    --popover-foreground: 0.18 0.03 30;
+    --primary: 0.38 0.12 10;
+    --primary-foreground: 0.97 0.01 60;
+    --secondary: 0.88 0.04 60;
+    --secondary-foreground: 0.25 0.06 20;
+    --muted: 0.91 0.02 65;
+    --muted-foreground: 0.48 0.04 40;
+    --accent: 0.65 0.13 40;
+    --accent-foreground: 0.97 0.01 60;
+    --destructive: 0.52 0.2 25;
+    --destructive-foreground: 0.97 0.01 60;
+    --border: 0.87 0.03 55;
+    --input: 0.87 0.03 55;
+    --ring: 0.38 0.12 10;
+    --radius: 0.5rem;
+    --chart-1: 0.38 0.12 10;
+    --chart-2: 0.65 0.13 40;
+    --chart-3: 0.72 0.15 220;
+    --chart-4: 0.62 0.14 145;
+    --chart-5: 0.55 0.1 80;
+    --sidebar: 0.22 0.06 15;
+    --sidebar-foreground: 0.92 0.02 60;
+    --sidebar-primary: 0.65 0.13 40;
+    --sidebar-primary-foreground: 0.97 0.01 60;
+    --sidebar-accent: 0.3 0.06 15;
+    --sidebar-accent-foreground: 0.92 0.02 60;
+    --sidebar-border: 0.3 0.06 15;
+    --sidebar-ring: 0.65 0.13 40;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground font-body;
+  }
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    @apply font-display;
+  }
+}
+
+.floor-plan-canvas {
+  background-color: oklch(0.93 0.015 65);
+  background-image: radial-gradient(
+    circle,
+    oklch(0.78 0.025 55) 1px,
+    transparent 1px
+  );
+  background-size: 40px 40px;
+}
+
+.table-shape {
+  transition: box-shadow 0.15s ease, transform 0.1s ease;
+  cursor: grab;
+  user-select: none;
+}
+.table-shape:hover {
+  box-shadow: 0 8px 24px oklch(0.18 0.06 30 / 0.25);
+  transform: translateY(-1px);
+}
+.table-shape.dragging {
+  cursor: grabbing;
+  transform: scale(1.05);
+  box-shadow: 0 16px 40px oklch(0.18 0.06 30 / 0.35);
+  z-index: 100;
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: oklch(0.91 0.02 65);
+}
+::-webkit-scrollbar-thumb {
+  background: oklch(0.65 0.06 40);
+  border-radius: 3px;
+}
