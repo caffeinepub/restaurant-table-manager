@@ -4,10 +4,17 @@ import Layout from "./components/Layout";
 import { useInternetIdentity } from "./hooks/useInternetIdentity";
 import FloorPlanPage from "./pages/FloorPlanPage";
 import LoginPage from "./pages/LoginPage";
+import MenuPage from "./pages/MenuPage";
 import ReservationsPage from "./pages/ReservationsPage";
 import TodayPage from "./pages/TodayPage";
+import WaiterPage from "./pages/WaiterPage";
 
-export type AppPage = "piantina" | "prenotazioni" | "oggi";
+export type AppPage =
+  | "piantina"
+  | "prenotazioni"
+  | "oggi"
+  | "menu"
+  | "cameriere";
 
 export default function App() {
   const { identity, isInitializing } = useInternetIdentity();
@@ -41,6 +48,8 @@ export default function App() {
         {currentPage === "oggi" && <TodayPage />}
         {currentPage === "piantina" && <FloorPlanPage />}
         {currentPage === "prenotazioni" && <ReservationsPage />}
+        {currentPage === "menu" && <MenuPage />}
+        {currentPage === "cameriere" && <WaiterPage />}
       </Layout>
       <Toaster />
     </>

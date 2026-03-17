@@ -4,8 +4,10 @@ import {
   BookOpen,
   CalendarDays,
   ChefHat,
+  ConciergeBell,
   LayoutGrid,
   LogOut,
+  ScrollText,
   UtensilsCrossed,
 } from "lucide-react";
 import type { ReactNode } from "react";
@@ -36,6 +38,18 @@ const navItems: {
     label: "Prenotazioni",
     icon: CalendarDays,
     ocid: "nav.prenotazioni.link",
+  },
+  {
+    page: "menu",
+    label: "Menu",
+    icon: ScrollText,
+    ocid: "nav.menu.link",
+  },
+  {
+    page: "cameriere",
+    label: "Cameriere",
+    icon: ConciergeBell,
+    ocid: "nav.cameriere.link",
   },
 ];
 

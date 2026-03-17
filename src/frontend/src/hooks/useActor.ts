@@ -26,21 +26,14 @@ export function useActor() {
       };
 
       const actor = await createActorWithConfig(actorOptions);
-      // Silently ignore initialization errors so the actor is always returned
-      try {
-        const adminToken = getSecretParameter("caffeineAdminToken") || "";
-        await actor._initializeAccessControlWithSecret(adminToken);
-      } catch (_e) {
-        // Ignore - actor still works for all operations
-      }
+      const adminToken = getSecretParameter("caffeineAdminToken") || "";
+      await actor._initializeAccessControlWithSecret(adminToken);
       return actor;
     },
     // Only refetch when identity changes
     staleTime: Number.POSITIVE_INFINITY,
     // This will cause the actor to be recreated when the identity changes
     enabled: true,
-    // Never throw - always return whatever we have
-    retry: false,
   });
 
   // When the actor changes, invalidate dependent queries

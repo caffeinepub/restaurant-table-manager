@@ -89,13 +89,24 @@ export class ExternalBlob {
         return this;
     }
 }
+export interface MenuItem {
+    id: MenuItemId;
+    name: string;
+    description: string;
+    available: boolean;
+    category: string;
+    price: number;
+}
+export type MenuItemId = bigint;
 export interface Table {
     id: TableId;
+    height: number;
     posX: number;
     posY: number;
     shape: string;
     capacity: bigint;
     roomId: RoomId;
+    width: number;
     tableLabel: string;
 }
 export type RoomId = bigint;
@@ -126,16 +137,21 @@ export enum UserRole {
 export interface backendInterface {
     _initializeAccessControlWithSecret(userSecret: string): Promise<void>;
     assignCallerUserRole(user: Principal, role: UserRole): Promise<void>;
+    createMenuItem(name: string, description: string, price: number, category: string, available: boolean): Promise<MenuItemId>;
     createReservation(tableId: TableId, customerName: string, date: string, time: string, partySize: bigint, notes: string): Promise<ReservationId>;
     createRoom(name: string): Promise<RoomId>;
-    createTable(roomId: RoomId, tableLabel: string, shape: string, capacity: bigint, posX: number, posY: number): Promise<TableId>;
+    createTable(roomId: RoomId, tableLabel: string, shape: string, capacity: bigint, posX: number, posY: number, width: number, height: number): Promise<TableId>;
+    deleteMenuItem(menuItemId: MenuItemId): Promise<void>;
     deleteReservation(reservationId: ReservationId): Promise<void>;
     deleteRoom(roomId: RoomId): Promise<void>;
     deleteTable(tableId: TableId): Promise<void>;
+    getAllMenuItems(): Promise<Array<MenuItem>>;
     getAllReservations(): Promise<Array<Reservation>>;
     getAllRooms(): Promise<Array<Room>>;
     getCallerUserProfile(): Promise<UserProfile | null>;
     getCallerUserRole(): Promise<UserRole>;
+    getMenuItem(menuItemId: MenuItemId): Promise<MenuItem | null>;
+    getMenuItemsByCategory(category: string): Promise<Array<MenuItem>>;
     getReservation(reservationId: ReservationId): Promise<Reservation | null>;
     getReservationsByDate(date: string): Promise<Array<Reservation>>;
     getReservationsByTable(tableId: TableId): Promise<Array<Reservation>>;
@@ -145,11 +161,12 @@ export interface backendInterface {
     getUserProfile(user: Principal): Promise<UserProfile | null>;
     isCallerAdmin(): Promise<boolean>;
     saveCallerUserProfile(profile: UserProfile): Promise<void>;
+    updateMenuItem(id: MenuItemId, name: string, description: string, price: number, category: string, available: boolean): Promise<void>;
     updateReservation(reservationId: ReservationId, tableId: TableId, customerName: string, date: string, time: string, partySize: bigint, notes: string, status: string): Promise<void>;
     updateRoom(roomId: RoomId, name: string): Promise<void>;
-    updateTable(tableId: TableId, roomId: RoomId, tableLabel: string, shape: string, capacity: bigint, posX: number, posY: number): Promise<void>;
+    updateTable(tableId: TableId, roomId: RoomId, tableLabel: string, shape: string, capacity: bigint, posX: number, posY: number, width: number, height: number): Promise<void>;
 }
-import type { Reservation as _Reservation, Room as _Room, Table as _Table, UserProfile as _UserProfile, UserRole as _UserRole } from "./declarations/backend.did.d.ts";
+import type { MenuItem as _MenuItem, Reservation as _Reservation, Room as _Room, Table as _Table, UserProfile as _UserProfile, UserRole as _UserRole } from "./declarations/backend.did.d.ts";
 export class Backend implements backendInterface {
     constructor(private actor: ActorSubclass<_SERVICE>, private _uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, private _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, private processError?: (error: unknown) => never){}
     async _initializeAccessControlWithSecret(arg0: string): Promise<void> {
@@ -177,6 +194,20 @@ export class Backend implements backendInterface {
             }
         } else {
             const result = await this.actor.assignCallerUserRole(arg0, to_candid_UserRole_n1(this._uploadFile, this._downloadFile, arg1));
+            return result;
+        }
+    }
+    async createMenuItem(arg0: string, arg1: string, arg2: number, arg3: string, arg4: boolean): Promise<MenuItemId> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.createMenuItem(arg0, arg1, arg2, arg3, arg4);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.createMenuItem(arg0, arg1, arg2, arg3, arg4);
             return result;
         }
     }
@@ -208,17 +239,31 @@ export class Backend implements backendInterface {
             return result;
         }
     }
-    async createTable(arg0: RoomId, arg1: string, arg2: string, arg3: bigint, arg4: number, arg5: number): Promise<TableId> {
+    async createTable(arg0: RoomId, arg1: string, arg2: string, arg3: bigint, arg4: number, arg5: number, arg6: number, arg7: number): Promise<TableId> {
         if (this.processError) {
             try {
-                const result = await this.actor.createTable(arg0, arg1, arg2, arg3, arg4, arg5);
+                const result = await this.actor.createTable(arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7);
                 return result;
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
-            const result = await this.actor.createTable(arg0, arg1, arg2, arg3, arg4, arg5);
+            const result = await this.actor.createTable(arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7);
+            return result;
+        }
+    }
+    async deleteMenuItem(arg0: MenuItemId): Promise<void> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.deleteMenuItem(arg0);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.deleteMenuItem(arg0);
             return result;
         }
     }
@@ -261,6 +306,20 @@ export class Backend implements backendInterface {
             }
         } else {
             const result = await this.actor.deleteTable(arg0);
+            return result;
+        }
+    }
+    async getAllMenuItems(): Promise<Array<MenuItem>> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.getAllMenuItems();
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.getAllMenuItems();
             return result;
         }
     }
@@ -320,18 +379,46 @@ export class Backend implements backendInterface {
             return from_candid_UserRole_n4(this._uploadFile, this._downloadFile, result);
         }
     }
-    async getReservation(arg0: ReservationId): Promise<Reservation | null> {
+    async getMenuItem(arg0: MenuItemId): Promise<MenuItem | null> {
         if (this.processError) {
             try {
-                const result = await this.actor.getReservation(arg0);
+                const result = await this.actor.getMenuItem(arg0);
                 return from_candid_opt_n6(this._uploadFile, this._downloadFile, result);
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
-            const result = await this.actor.getReservation(arg0);
+            const result = await this.actor.getMenuItem(arg0);
             return from_candid_opt_n6(this._uploadFile, this._downloadFile, result);
+        }
+    }
+    async getMenuItemsByCategory(arg0: string): Promise<Array<MenuItem>> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.getMenuItemsByCategory(arg0);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.getMenuItemsByCategory(arg0);
+            return result;
+        }
+    }
+    async getReservation(arg0: ReservationId): Promise<Reservation | null> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.getReservation(arg0);
+                return from_candid_opt_n7(this._uploadFile, this._downloadFile, result);
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.getReservation(arg0);
+            return from_candid_opt_n7(this._uploadFile, this._downloadFile, result);
         }
     }
     async getReservationsByDate(arg0: string): Promise<Array<Reservation>> {
@@ -366,28 +453,28 @@ export class Backend implements backendInterface {
         if (this.processError) {
             try {
                 const result = await this.actor.getRoom(arg0);
-                return from_candid_opt_n7(this._uploadFile, this._downloadFile, result);
-            } catch (e) {
-                this.processError(e);
-                throw new Error("unreachable");
-            }
-        } else {
-            const result = await this.actor.getRoom(arg0);
-            return from_candid_opt_n7(this._uploadFile, this._downloadFile, result);
-        }
-    }
-    async getTable(arg0: TableId): Promise<Table | null> {
-        if (this.processError) {
-            try {
-                const result = await this.actor.getTable(arg0);
                 return from_candid_opt_n8(this._uploadFile, this._downloadFile, result);
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
-            const result = await this.actor.getTable(arg0);
+            const result = await this.actor.getRoom(arg0);
             return from_candid_opt_n8(this._uploadFile, this._downloadFile, result);
+        }
+    }
+    async getTable(arg0: TableId): Promise<Table | null> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.getTable(arg0);
+                return from_candid_opt_n9(this._uploadFile, this._downloadFile, result);
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.getTable(arg0);
+            return from_candid_opt_n9(this._uploadFile, this._downloadFile, result);
         }
     }
     async getTablesByRoom(arg0: RoomId): Promise<Array<Table>> {
@@ -446,6 +533,20 @@ export class Backend implements backendInterface {
             return result;
         }
     }
+    async updateMenuItem(arg0: MenuItemId, arg1: string, arg2: string, arg3: number, arg4: string, arg5: boolean): Promise<void> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.updateMenuItem(arg0, arg1, arg2, arg3, arg4, arg5);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.updateMenuItem(arg0, arg1, arg2, arg3, arg4, arg5);
+            return result;
+        }
+    }
     async updateReservation(arg0: ReservationId, arg1: TableId, arg2: string, arg3: string, arg4: string, arg5: bigint, arg6: string, arg7: string): Promise<void> {
         if (this.processError) {
             try {
@@ -474,17 +575,17 @@ export class Backend implements backendInterface {
             return result;
         }
     }
-    async updateTable(arg0: TableId, arg1: RoomId, arg2: string, arg3: string, arg4: bigint, arg5: number, arg6: number): Promise<void> {
+    async updateTable(arg0: TableId, arg1: RoomId, arg2: string, arg3: string, arg4: bigint, arg5: number, arg6: number, arg7: number, arg8: number): Promise<void> {
         if (this.processError) {
             try {
-                const result = await this.actor.updateTable(arg0, arg1, arg2, arg3, arg4, arg5, arg6);
+                const result = await this.actor.updateTable(arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8);
                 return result;
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
-            const result = await this.actor.updateTable(arg0, arg1, arg2, arg3, arg4, arg5, arg6);
+            const result = await this.actor.updateTable(arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8);
             return result;
         }
     }
@@ -495,13 +596,16 @@ function from_candid_UserRole_n4(_uploadFile: (file: ExternalBlob) => Promise<Ui
 function from_candid_opt_n3(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: [] | [_UserProfile]): UserProfile | null {
     return value.length === 0 ? null : value[0];
 }
-function from_candid_opt_n6(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: [] | [_Reservation]): Reservation | null {
+function from_candid_opt_n6(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: [] | [_MenuItem]): MenuItem | null {
     return value.length === 0 ? null : value[0];
 }
-function from_candid_opt_n7(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: [] | [_Room]): Room | null {
+function from_candid_opt_n7(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: [] | [_Reservation]): Reservation | null {
     return value.length === 0 ? null : value[0];
 }
-function from_candid_opt_n8(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: [] | [_Table]): Table | null {
+function from_candid_opt_n8(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: [] | [_Room]): Room | null {
+    return value.length === 0 ? null : value[0];
+}
+function from_candid_opt_n9(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: [] | [_Table]): Table | null {
     return value.length === 0 ? null : value[0];
 }
 function from_candid_variant_n5(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {

@@ -55,6 +55,9 @@ const CANVAS_W = 800;
 const CANVAS_H = 560;
 const today = new Date().toISOString().split("T")[0];
 
+const MIN_SIZE = 56;
+const MAX_SIZE = 200;
+
 type TableStatus = "libero" | "prenotato" | "occupato";
 
 function getTableStatus(
@@ -88,6 +91,7 @@ interface TableShapeProps {
   onEdit: () => void;
   onDelete: () => void;
   onDragEnd: (posX: number, posY: number) => void;
+  onResizeEnd: (w: number, h: number) => void;
 }
 
 function TableShape({
@@ -97,6 +101,7 @@ function TableShape({
   onEdit,
   onDelete,
   onDragEnd,
+  onResizeEnd,
 }: TableShapeProps) {
   const isDragging = useRef(false);
   const startPointer = useRef({ x: 0, y: 0 });
@@ -105,7 +110,15 @@ function TableShape({
   const elemRef = useRef<HTMLDivElement>(null);
   const [draggingState, setDraggingState] = useState(false);
   const [hovered, setHovered] = useState(false);
-  const size = table.shape === "round" ? 72 : 80;
+
+  // Resize state - use backend values if available, else defaults
+  const initialSize = {
+    w: table.width > 0 ? table.width : table.shape === "round" ? 72 : 80,
+    h: table.height > 0 ? table.height : table.shape === "round" ? 72 : 72,
+  };
+  const [tableSize, setTableSize] = useState(initialSize);
+  const isResizing = useRef(false);
+  const resizeStart = useRef({ x: 0, y: 0, w: 0, h: 0 });
 
   const applyDrag = useCallback(
     (clientX: number, clientY: number) => {
@@ -118,13 +131,15 @@ function TableShape({
         }
       }
       if (!isDragging.current) return;
+      const currentW = elemRef.current?.offsetWidth ?? tableSize.w;
+      const currentH = elemRef.current?.offsetHeight ?? tableSize.h;
       const newX = Math.max(
         0,
-        Math.min(CANVAS_W - size, startPos.current.x + dx),
+        Math.min(CANVAS_W - currentW, startPos.current.x + dx),
       );
       const newY = Math.max(
         0,
-        Math.min(CANVAS_H - size, startPos.current.y + dy),
+        Math.min(CANVAS_H - currentH, startPos.current.y + dy),
       );
       currentPos.current = { x: newX, y: newY };
       if (elemRef.current) {
@@ -132,7 +147,7 @@ function TableShape({
         elemRef.current.style.top = `${newY}px`;
       }
     },
-    [size],
+    [tableSize.w, tableSize.h],
   );
 
   const endDrag = useCallback(() => {
@@ -193,6 +208,114 @@ function TableShape({
     [table.posX, table.posY, applyDrag, endDrag],
   );
 
+  // Resize handlers
+  const handleResizeMouseDown = useCallback(
+    (e: React.MouseEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      isResizing.current = true;
+      resizeStart.current = {
+        x: e.clientX,
+        y: e.clientY,
+        w: tableSize.w,
+        h: tableSize.h,
+      };
+
+      const onMouseMove = (ev: MouseEvent) => {
+        if (!isResizing.current) return;
+        const dx = ev.clientX - resizeStart.current.x;
+        const dy = ev.clientY - resizeStart.current.y;
+        if (table.shape === "round") {
+          const delta = Math.max(dx, dy);
+          const s = Math.max(
+            MIN_SIZE,
+            Math.min(MAX_SIZE, resizeStart.current.w + delta),
+          );
+          setTableSize({ w: s, h: s });
+        } else {
+          const newW = Math.max(
+            MIN_SIZE,
+            Math.min(MAX_SIZE, resizeStart.current.w + dx),
+          );
+          const newH = Math.max(
+            MIN_SIZE,
+            Math.min(MAX_SIZE, resizeStart.current.h + dy),
+          );
+          setTableSize({ w: newW, h: newH });
+        }
+      };
+
+      const onMouseUp = () => {
+        document.removeEventListener("mousemove", onMouseMove);
+        document.removeEventListener("mouseup", onMouseUp);
+        isResizing.current = false;
+        setTableSize((prev) => {
+          onResizeEnd(prev.w, prev.h);
+          return prev;
+        });
+      };
+
+      document.addEventListener("mousemove", onMouseMove);
+      document.addEventListener("mouseup", onMouseUp);
+    },
+    [table.shape, tableSize.w, tableSize.h, onResizeEnd],
+  );
+
+  const handleResizeTouchStart = useCallback(
+    (e: React.TouchEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const touch = e.touches[0];
+      isResizing.current = true;
+      resizeStart.current = {
+        x: touch.clientX,
+        y: touch.clientY,
+        w: tableSize.w,
+        h: tableSize.h,
+      };
+
+      const onTouchMove = (ev: TouchEvent) => {
+        ev.preventDefault();
+        if (!isResizing.current) return;
+        const t = ev.touches[0];
+        const dx = t.clientX - resizeStart.current.x;
+        const dy = t.clientY - resizeStart.current.y;
+        if (table.shape === "round") {
+          const delta = Math.max(dx, dy);
+          const s = Math.max(
+            MIN_SIZE,
+            Math.min(MAX_SIZE, resizeStart.current.w + delta),
+          );
+          setTableSize({ w: s, h: s });
+        } else {
+          const newW = Math.max(
+            MIN_SIZE,
+            Math.min(MAX_SIZE, resizeStart.current.w + dx),
+          );
+          const newH = Math.max(
+            MIN_SIZE,
+            Math.min(MAX_SIZE, resizeStart.current.h + dy),
+          );
+          setTableSize({ w: newW, h: newH });
+        }
+      };
+
+      const onTouchEnd = () => {
+        document.removeEventListener("touchmove", onTouchMove);
+        document.removeEventListener("touchend", onTouchEnd);
+        isResizing.current = false;
+        setTableSize((prev) => {
+          onResizeEnd(prev.w, prev.h);
+          return prev;
+        });
+      };
+
+      document.addEventListener("touchmove", onTouchMove, { passive: false });
+      document.addEventListener("touchend", onTouchEnd);
+    },
+    [table.shape, tableSize.w, tableSize.h, onResizeEnd],
+  );
+
   return (
     <div
       ref={elemRef}
@@ -205,8 +328,8 @@ function TableShape({
       style={{
         left: table.posX,
         top: table.posY,
-        width: size,
-        height: size,
+        width: tableSize.w,
+        height: tableSize.h,
         background: "oklch(0.97 0.01 65)",
         zIndex: draggingState ? 20 : hovered ? 10 : 1,
         cursor: draggingState ? "grabbing" : "grab",
@@ -274,6 +397,44 @@ function TableShape({
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
+      </div>
+
+      {/* Resize handle - shown on hover at bottom-right */}
+      <div
+        data-ocid="floorplan.table.drag_handle"
+        className={cn(
+          "absolute bottom-0.5 right-0.5 z-30 transition-opacity duration-150",
+          hovered && !draggingState ? "opacity-100" : "opacity-0",
+        )}
+        style={{ cursor: "nwse-resize" }}
+        onMouseDown={handleResizeMouseDown}
+        onTouchStart={handleResizeTouchStart}
+        title="Ridimensiona tavolo"
+      >
+        <div
+          style={{
+            width: 10,
+            height: 10,
+            borderRadius: 3,
+            background: "oklch(0.5 0.05 65 / 0.6)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          <svg
+            width="8"
+            height="8"
+            viewBox="0 0 8 8"
+            fill="none"
+            aria-label="Ridimensiona"
+            role="img"
+          >
+            <circle cx="2" cy="6" r="1" fill="currentColor" opacity="0.7" />
+            <circle cx="6" cy="6" r="1" fill="currentColor" opacity="0.7" />
+            <circle cx="6" cy="2" r="1" fill="currentColor" opacity="0.7" />
+          </svg>
+        </div>
       </div>
 
       <span className={cn("w-2.5 h-2.5 rounded-full", statusBg[status])} />
@@ -352,8 +513,30 @@ function RoomCanvas({
           capacity: table.capacity,
           posX,
           posY,
+          width: table.width > 0 ? table.width : 80,
+          height: table.height > 0 ? table.height : 72,
         },
         { onError: () => toast.error("Errore nel salvare la posizione") },
+      );
+    },
+    [updateTable],
+  );
+
+  const handleResizeEnd = useCallback(
+    (table: Table, w: number, h: number) => {
+      updateTable.mutate(
+        {
+          tableId: table.id,
+          roomId: table.roomId,
+          tableLabel: table.tableLabel,
+          shape: table.shape,
+          capacity: table.capacity,
+          posX: table.posX,
+          posY: table.posY,
+          width: w,
+          height: h,
+        },
+        { onError: () => toast.error("Errore nel salvare le dimensioni") },
       );
     },
     [updateTable],
@@ -369,6 +552,8 @@ function RoomCanvas({
         capacity: BigInt(Number.parseInt(newCapacity) || 4),
         posX: 50 + Math.random() * 300,
         posY: 50 + Math.random() * 200,
+        width: newShape === "round" ? 72 : 80,
+        height: 72,
       },
       {
         onSuccess: () => {
@@ -401,6 +586,8 @@ function RoomCanvas({
         capacity: BigInt(Number.parseInt(editCapacity) || 4),
         posX: tableToEdit.posX,
         posY: tableToEdit.posY,
+        width: tableToEdit.width > 0 ? tableToEdit.width : 80,
+        height: tableToEdit.height > 0 ? tableToEdit.height : 72,
       },
       {
         onSuccess: () => {
@@ -473,7 +660,8 @@ function RoomCanvas({
             </span>
             <span className="text-muted-foreground/60">·</span>
             <span className="text-muted-foreground/80 italic">
-              Clicca un tavolo per prenotare
+              Clicca un tavolo per prenotare · Trascina l&apos;angolo per
+              ridimensionare
             </span>
           </div>
           <Button
@@ -520,6 +708,7 @@ function RoomCanvas({
                 onEdit={() => handleEditOpen(table)}
                 onDelete={() => setTableToDelete(table)}
                 onDragEnd={(x, y) => handleDragEnd(table, x, y)}
+                onResizeEnd={(w, h) => handleResizeEnd(table, w, h)}
               />
             ))}
           </div>

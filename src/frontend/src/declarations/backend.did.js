@@ -13,9 +13,18 @@ export const UserRole = IDL.Variant({
   'user' : IDL.Null,
   'guest' : IDL.Null,
 });
+export const MenuItemId = IDL.Nat;
 export const TableId = IDL.Nat;
 export const ReservationId = IDL.Nat;
 export const RoomId = IDL.Nat;
+export const MenuItem = IDL.Record({
+  'id' : MenuItemId,
+  'name' : IDL.Text,
+  'description' : IDL.Text,
+  'available' : IDL.Bool,
+  'category' : IDL.Text,
+  'price' : IDL.Float64,
+});
 export const Reservation = IDL.Record({
   'id' : ReservationId,
   'customerName' : IDL.Text,
@@ -30,17 +39,24 @@ export const Room = IDL.Record({ 'id' : RoomId, 'name' : IDL.Text });
 export const UserProfile = IDL.Record({ 'name' : IDL.Text });
 export const Table = IDL.Record({
   'id' : TableId,
+  'height' : IDL.Float64,
   'posX' : IDL.Float64,
   'posY' : IDL.Float64,
   'shape' : IDL.Text,
   'capacity' : IDL.Nat,
   'roomId' : RoomId,
+  'width' : IDL.Float64,
   'tableLabel' : IDL.Text,
 });
 
 export const idlService = IDL.Service({
   '_initializeAccessControlWithSecret' : IDL.Func([IDL.Text], [], []),
   'assignCallerUserRole' : IDL.Func([IDL.Principal, UserRole], [], []),
+  'createMenuItem' : IDL.Func(
+      [IDL.Text, IDL.Text, IDL.Float64, IDL.Text, IDL.Bool],
+      [MenuItemId],
+      [],
+    ),
   'createReservation' : IDL.Func(
       [TableId, IDL.Text, IDL.Text, IDL.Text, IDL.Nat, IDL.Text],
       [ReservationId],
@@ -48,17 +64,34 @@ export const idlService = IDL.Service({
     ),
   'createRoom' : IDL.Func([IDL.Text], [RoomId], []),
   'createTable' : IDL.Func(
-      [RoomId, IDL.Text, IDL.Text, IDL.Nat, IDL.Float64, IDL.Float64],
+      [
+        RoomId,
+        IDL.Text,
+        IDL.Text,
+        IDL.Nat,
+        IDL.Float64,
+        IDL.Float64,
+        IDL.Float64,
+        IDL.Float64,
+      ],
       [TableId],
       [],
     ),
+  'deleteMenuItem' : IDL.Func([MenuItemId], [], []),
   'deleteReservation' : IDL.Func([ReservationId], [], []),
   'deleteRoom' : IDL.Func([RoomId], [], []),
   'deleteTable' : IDL.Func([TableId], [], []),
+  'getAllMenuItems' : IDL.Func([], [IDL.Vec(MenuItem)], ['query']),
   'getAllReservations' : IDL.Func([], [IDL.Vec(Reservation)], ['query']),
   'getAllRooms' : IDL.Func([], [IDL.Vec(Room)], ['query']),
   'getCallerUserProfile' : IDL.Func([], [IDL.Opt(UserProfile)], ['query']),
   'getCallerUserRole' : IDL.Func([], [UserRole], ['query']),
+  'getMenuItem' : IDL.Func([MenuItemId], [IDL.Opt(MenuItem)], ['query']),
+  'getMenuItemsByCategory' : IDL.Func(
+      [IDL.Text],
+      [IDL.Vec(MenuItem)],
+      ['query'],
+    ),
   'getReservation' : IDL.Func(
       [ReservationId],
       [IDL.Opt(Reservation)],
@@ -84,6 +117,11 @@ export const idlService = IDL.Service({
     ),
   'isCallerAdmin' : IDL.Func([], [IDL.Bool], ['query']),
   'saveCallerUserProfile' : IDL.Func([UserProfile], [], []),
+  'updateMenuItem' : IDL.Func(
+      [MenuItemId, IDL.Text, IDL.Text, IDL.Float64, IDL.Text, IDL.Bool],
+      [],
+      [],
+    ),
   'updateReservation' : IDL.Func(
       [
         ReservationId,
@@ -100,7 +138,17 @@ export const idlService = IDL.Service({
     ),
   'updateRoom' : IDL.Func([RoomId, IDL.Text], [], []),
   'updateTable' : IDL.Func(
-      [TableId, RoomId, IDL.Text, IDL.Text, IDL.Nat, IDL.Float64, IDL.Float64],
+      [
+        TableId,
+        RoomId,
+        IDL.Text,
+        IDL.Text,
+        IDL.Nat,
+        IDL.Float64,
+        IDL.Float64,
+        IDL.Float64,
+        IDL.Float64,
+      ],
       [],
       [],
     ),
@@ -114,9 +162,18 @@ export const idlFactory = ({ IDL }) => {
     'user' : IDL.Null,
     'guest' : IDL.Null,
   });
+  const MenuItemId = IDL.Nat;
   const TableId = IDL.Nat;
   const ReservationId = IDL.Nat;
   const RoomId = IDL.Nat;
+  const MenuItem = IDL.Record({
+    'id' : MenuItemId,
+    'name' : IDL.Text,
+    'description' : IDL.Text,
+    'available' : IDL.Bool,
+    'category' : IDL.Text,
+    'price' : IDL.Float64,
+  });
   const Reservation = IDL.Record({
     'id' : ReservationId,
     'customerName' : IDL.Text,
@@ -131,17 +188,24 @@ export const idlFactory = ({ IDL }) => {
   const UserProfile = IDL.Record({ 'name' : IDL.Text });
   const Table = IDL.Record({
     'id' : TableId,
+    'height' : IDL.Float64,
     'posX' : IDL.Float64,
     'posY' : IDL.Float64,
     'shape' : IDL.Text,
     'capacity' : IDL.Nat,
     'roomId' : RoomId,
+    'width' : IDL.Float64,
     'tableLabel' : IDL.Text,
   });
   
   return IDL.Service({
     '_initializeAccessControlWithSecret' : IDL.Func([IDL.Text], [], []),
     'assignCallerUserRole' : IDL.Func([IDL.Principal, UserRole], [], []),
+    'createMenuItem' : IDL.Func(
+        [IDL.Text, IDL.Text, IDL.Float64, IDL.Text, IDL.Bool],
+        [MenuItemId],
+        [],
+      ),
     'createReservation' : IDL.Func(
         [TableId, IDL.Text, IDL.Text, IDL.Text, IDL.Nat, IDL.Text],
         [ReservationId],
@@ -149,17 +213,34 @@ export const idlFactory = ({ IDL }) => {
       ),
     'createRoom' : IDL.Func([IDL.Text], [RoomId], []),
     'createTable' : IDL.Func(
-        [RoomId, IDL.Text, IDL.Text, IDL.Nat, IDL.Float64, IDL.Float64],
+        [
+          RoomId,
+          IDL.Text,
+          IDL.Text,
+          IDL.Nat,
+          IDL.Float64,
+          IDL.Float64,
+          IDL.Float64,
+          IDL.Float64,
+        ],
         [TableId],
         [],
       ),
+    'deleteMenuItem' : IDL.Func([MenuItemId], [], []),
     'deleteReservation' : IDL.Func([ReservationId], [], []),
     'deleteRoom' : IDL.Func([RoomId], [], []),
     'deleteTable' : IDL.Func([TableId], [], []),
+    'getAllMenuItems' : IDL.Func([], [IDL.Vec(MenuItem)], ['query']),
     'getAllReservations' : IDL.Func([], [IDL.Vec(Reservation)], ['query']),
     'getAllRooms' : IDL.Func([], [IDL.Vec(Room)], ['query']),
     'getCallerUserProfile' : IDL.Func([], [IDL.Opt(UserProfile)], ['query']),
     'getCallerUserRole' : IDL.Func([], [UserRole], ['query']),
+    'getMenuItem' : IDL.Func([MenuItemId], [IDL.Opt(MenuItem)], ['query']),
+    'getMenuItemsByCategory' : IDL.Func(
+        [IDL.Text],
+        [IDL.Vec(MenuItem)],
+        ['query'],
+      ),
     'getReservation' : IDL.Func(
         [ReservationId],
         [IDL.Opt(Reservation)],
@@ -185,6 +266,11 @@ export const idlFactory = ({ IDL }) => {
       ),
     'isCallerAdmin' : IDL.Func([], [IDL.Bool], ['query']),
     'saveCallerUserProfile' : IDL.Func([UserProfile], [], []),
+    'updateMenuItem' : IDL.Func(
+        [MenuItemId, IDL.Text, IDL.Text, IDL.Float64, IDL.Text, IDL.Bool],
+        [],
+        [],
+      ),
     'updateReservation' : IDL.Func(
         [
           ReservationId,
@@ -207,6 +293,8 @@ export const idlFactory = ({ IDL }) => {
           IDL.Text,
           IDL.Text,
           IDL.Nat,
+          IDL.Float64,
+          IDL.Float64,
           IDL.Float64,
           IDL.Float64,
         ],

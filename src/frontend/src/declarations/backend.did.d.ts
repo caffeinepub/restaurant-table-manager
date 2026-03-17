@@ -10,6 +10,15 @@ import type { ActorMethod } from '@icp-sdk/core/agent';
 import type { IDL } from '@icp-sdk/core/candid';
 import type { Principal } from '@icp-sdk/core/principal';
 
+export interface MenuItem {
+  'id' : MenuItemId,
+  'name' : string,
+  'description' : string,
+  'available' : boolean,
+  'category' : string,
+  'price' : number,
+}
+export type MenuItemId = bigint;
 export interface Reservation {
   'id' : ReservationId,
   'customerName' : string,
@@ -25,11 +34,13 @@ export interface Room { 'id' : RoomId, 'name' : string }
 export type RoomId = bigint;
 export interface Table {
   'id' : TableId,
+  'height' : number,
   'posX' : number,
   'posY' : number,
   'shape' : string,
   'capacity' : bigint,
   'roomId' : RoomId,
+  'width' : number,
   'tableLabel' : string,
 }
 export type TableId = bigint;
@@ -40,22 +51,30 @@ export type UserRole = { 'admin' : null } |
 export interface _SERVICE {
   '_initializeAccessControlWithSecret' : ActorMethod<[string], undefined>,
   'assignCallerUserRole' : ActorMethod<[Principal, UserRole], undefined>,
+  'createMenuItem' : ActorMethod<
+    [string, string, number, string, boolean],
+    MenuItemId
+  >,
   'createReservation' : ActorMethod<
     [TableId, string, string, string, bigint, string],
     ReservationId
   >,
   'createRoom' : ActorMethod<[string], RoomId>,
   'createTable' : ActorMethod<
-    [RoomId, string, string, bigint, number, number],
+    [RoomId, string, string, bigint, number, number, number, number],
     TableId
   >,
+  'deleteMenuItem' : ActorMethod<[MenuItemId], undefined>,
   'deleteReservation' : ActorMethod<[ReservationId], undefined>,
   'deleteRoom' : ActorMethod<[RoomId], undefined>,
   'deleteTable' : ActorMethod<[TableId], undefined>,
+  'getAllMenuItems' : ActorMethod<[], Array<MenuItem>>,
   'getAllReservations' : ActorMethod<[], Array<Reservation>>,
   'getAllRooms' : ActorMethod<[], Array<Room>>,
   'getCallerUserProfile' : ActorMethod<[], [] | [UserProfile]>,
   'getCallerUserRole' : ActorMethod<[], UserRole>,
+  'getMenuItem' : ActorMethod<[MenuItemId], [] | [MenuItem]>,
+  'getMenuItemsByCategory' : ActorMethod<[string], Array<MenuItem>>,
   'getReservation' : ActorMethod<[ReservationId], [] | [Reservation]>,
   'getReservationsByDate' : ActorMethod<[string], Array<Reservation>>,
   'getReservationsByTable' : ActorMethod<[TableId], Array<Reservation>>,
@@ -65,13 +84,17 @@ export interface _SERVICE {
   'getUserProfile' : ActorMethod<[Principal], [] | [UserProfile]>,
   'isCallerAdmin' : ActorMethod<[], boolean>,
   'saveCallerUserProfile' : ActorMethod<[UserProfile], undefined>,
+  'updateMenuItem' : ActorMethod<
+    [MenuItemId, string, string, number, string, boolean],
+    undefined
+  >,
   'updateReservation' : ActorMethod<
     [ReservationId, TableId, string, string, string, bigint, string, string],
     undefined
   >,
   'updateRoom' : ActorMethod<[RoomId, string], undefined>,
   'updateTable' : ActorMethod<
-    [TableId, RoomId, string, string, bigint, number, number],
+    [TableId, RoomId, string, string, bigint, number, number, number, number],
     undefined
   >,
 }
