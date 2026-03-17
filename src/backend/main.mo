@@ -75,18 +75,18 @@ actor {
     createdAt : Int;
   };
 
-  // Persistent storage
-  var stableRooms : [(RoomId, Room)] = [];
-  var stableTables : [(TableId, Table)] = [];
-  var stableReservations : [(ReservationId, Reservation)] = [];
-  var stableUserProfiles : [(Principal, UserProfile)] = [];
-  var stableMenuItems : [(MenuItemId, MenuItem)] = [];
-  var stableOrders : [(OrderId, Order)] = [];
-  var nextRoomId = 1;
-  var nextTableId = 1;
-  var nextReservationId = 1;
-  var nextMenuItemId = 1;
-  var nextOrderId = 1;
+  // Persistent stable storage
+  stable var stableRooms : [(RoomId, Room)] = [];
+  stable var stableTables : [(TableId, Table)] = [];
+  stable var stableReservations : [(ReservationId, Reservation)] = [];
+  stable var stableUserProfiles : [(Principal, UserProfile)] = [];
+  stable var stableMenuItems : [(MenuItemId, MenuItem)] = [];
+  stable var stableOrders : [(OrderId, Order)] = [];
+  stable var nextRoomId = 1;
+  stable var nextTableId = 1;
+  stable var nextReservationId = 1;
+  stable var nextMenuItemId = 1;
+  stable var nextOrderId = 1;
 
   // Working state
   var rooms = Map.empty<RoomId, Room>();
@@ -306,7 +306,7 @@ actor {
     category : Text,
     available : Bool,
   ) : async MenuItemId {
-    if (not (AccessControl.hasPermission(accessControlState, caller, #admin))) {
+    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
       Runtime.trap("Unauthorized");
     };
     let menuItemId = nextMenuItemId;
@@ -323,7 +323,7 @@ actor {
     category : Text,
     available : Bool,
   ) : async () {
-    if (not (AccessControl.hasPermission(accessControlState, caller, #admin))) {
+    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
       Runtime.trap("Unauthorized");
     };
     if (not menuItems.containsKey(id)) { Runtime.trap("Menu item does not exist") };
@@ -331,7 +331,7 @@ actor {
   };
 
   public shared ({ caller }) func deleteMenuItem(menuItemId : MenuItemId) : async () {
-    if (not (AccessControl.hasPermission(accessControlState, caller, #admin))) {
+    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
       Runtime.trap("Unauthorized");
     };
     if (not menuItems.containsKey(menuItemId)) { Runtime.trap("Menu item does not exist") };

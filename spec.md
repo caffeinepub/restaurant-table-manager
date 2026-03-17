@@ -1,28 +1,22 @@
 # Restaurant Table Manager
 
 ## Current State
-L'app ha: piantina interattiva, gestione prenotazioni, dashboard "Oggi", e sezione Menu per cibi e bibite. Il backend ha rooms, tables, reservations, menuItems con CRUD completo.
+WaiterPage mostra i tavoli per sala. Cliccando un tavolo si apre uno Sheet laterale (OrderPanel). Se non c'è ordine aperto, mostra un bottone "Nuova ordinazione"; poi un secondo bottone "Aggiungi articoli" apre il dialog del menu.
 
 ## Requested Changes (Diff)
 
 ### Add
-- Nuova sezione "Cameriere" con navigazione dedicata
-- Backend: tipo `Order` con tableId, lista di OrderItem (menuItemId + quantity + note), status ("aperta"/"chiusa"), timestamp
-- Backend: CRUD per ordini (createOrder, addOrderItem, removeOrderItem, closeOrder, getOrdersByTable, getOpenOrders, getAllOrders)
-- Backend: `getAllTables` query per recuperare tutti i tavoli senza filtro per sala
-- Frontend: `WaiterPage` che mostra tutti i tavoli raggruppati per sala con indicatore se il tavolo ha un ordine aperto
-- Frontend: panel laterale/dialog per gestire l'ordine di un tavolo: lista voci menu sfogliabili, aggiunta/rimozione items, quantità, totale, chiusura ordine
+- Quando si clicca un tavolo senza ordine aperto, il pannello crea automaticamente l'ordine e apre subito il dialog per aggiungere articoli dal menu (un solo click, nessun passaggio intermedio).
 
 ### Modify
-- `App.tsx`: aggiungere pagina "cameriere"
-- `Layout.tsx`: aggiungere voce di navigazione "Cameriere" con icona appropriata
+- OrderPanel: se non c'è ordine, invece di mostrare il bottone "Nuova ordinazione", crea l'ordine in automatico appena il pannello si apre e poi mostra direttamente l'AddItemsDialog.
+- Mantenere il flusso esistente per tavoli che hanno già un ordine aperto.
 
 ### Remove
-- Niente
+- Lo stato intermedio "Nessun ordine aperto" con il solo bottone "Nuova ordinazione" (sostituito dall'auto-creazione + apertura immediata del menu).
 
 ## Implementation Plan
-1. Aggiungere tipo Order/OrderItem e funzioni CRUD nel backend Motoko
-2. Aggiungere getAllTables nel backend
-3. Rigenerare il backend
-4. Creare WaiterPage nel frontend con visualizzazione tavoli e gestione ordini
-5. Aggiornare App.tsx e Layout.tsx
+1. In OrderPanel, aggiungere un `useEffect` che, quando il componente si monta e non c'è ordine (dopo il caricamento), esegue auto-createOrder e poi apre showAddItems=true.
+2. Mostrare uno stato di loading mentre si crea l'ordine automaticamente.
+3. Se la creazione fallisce, mostrare il bottone manuale come fallback.
+4. Nessuna modifica al backend.

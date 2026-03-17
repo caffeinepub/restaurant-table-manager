@@ -1,5 +1,5 @@
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
@@ -17,23 +17,26 @@ import {
 } from "@/components/ui/sheet";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
+  CalendarDays,
   ChefHat,
+  Clock,
   Loader2,
   Minus,
   Plus,
   ShoppingCart,
   Trash2,
+  Users,
   UtensilsCrossed,
   X,
 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import type { MenuItem, Room, Table } from "../backend.d";
+import type { MenuItem, Reservation, Room, Table } from "../backend.d";
 import type { Order } from "../hooks/useQueries";
 import {
   useAddItemToOrder,
   useAllMenuItems,
-  useAllTables,
+  useAllReservations,
   useCloseOrder,
   useCreateOrder,
   useDeleteOrder,
@@ -41,55 +44,62 @@ import {
   useOpenOrders,
   useRemoveItemFromOrder,
   useRooms,
+  useTablesByRoom,
 } from "../hooks/useQueries";
 
-function TableCard({
-  table,
-  index,
-  hasOpenOrder,
-  onClick,
-}: {
-  table: Table;
-  index: number;
-  hasOpenOrder: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      data-ocid={`waiter.table.item.${index}`}
-      onClick={onClick}
-      className="w-full text-left p-4 rounded-xl border border-border bg-card hover:bg-accent/30 transition-all group"
-    >
-      <div className="flex items-start justify-between gap-2">
-        <div className="flex-1 min-w-0">
-          <p className="font-semibold text-foreground truncate">
-            {table.tableLabel}
-          </p>
-          <p className="text-sm text-muted-foreground mt-0.5">
-            {Number(table.capacity)} posti
-          </p>
-        </div>
-        <Badge
-          className={
-            hasOpenOrder
-              ? "bg-amber-500/15 text-amber-700 border-amber-300 shrink-0"
-              : "bg-emerald-500/15 text-emerald-700 border-emerald-300 shrink-0"
-          }
-          variant="outline"
-        >
-          {hasOpenOrder ? "Ordine aperto" : "Libero"}
-        </Badge>
-      </div>
-      <div
-        data-ocid={`waiter.table.open_modal_button.${index}`}
-        className="mt-3 text-xs text-primary font-medium opacity-0 group-hover:opacity-100 transition-opacity"
-      >
-        Gestisci ordinazione →
-      </div>
-    </button>
+const today = new Date().toISOString().split("T")[0];
+
+function getTableStatus(
+  table: Table,
+  reservations: Reservation[],
+): "libero" | "prenotato" | "occupato" {
+  const todayRes = reservations.filter(
+    (r) =>
+      r.tableId === table.id && r.date === today && r.status !== "cancelled",
   );
+  if (todayRes.some((r) => r.status === "seated")) return "occupato";
+  if (todayRes.length > 0) return "prenotato";
+  return "libero";
 }
+
+function getNextReservation(
+  table: Table,
+  reservations: Reservation[],
+): Reservation | null {
+  const now = new Date();
+  const nowTime = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
+  const upcoming = reservations
+    .filter(
+      (r) =>
+        r.tableId === table.id &&
+        r.date === today &&
+        r.status !== "cancelled" &&
+        r.time >= nowTime,
+    )
+    .sort((a, b) => a.time.localeCompare(b.time));
+  return upcoming[0] ?? null;
+}
+
+const statusConfig = {
+  libero: {
+    label: "Libero",
+    bg: "bg-emerald-100",
+    text: "text-emerald-800",
+    dot: "bg-emerald-500",
+  },
+  prenotato: {
+    label: "Prenotato",
+    bg: "bg-blue-100",
+    text: "text-blue-800",
+    dot: "bg-blue-500",
+  },
+  occupato: {
+    label: "Occupato",
+    bg: "bg-red-100",
+    text: "text-red-800",
+    dot: "bg-red-500",
+  },
+};
 
 function AddItemsDialog({
   open,
@@ -281,10 +291,31 @@ function OrderPanel({
   const [showAddItems, setShowAddItems] = useState(false);
   const [showCloseConfirm, setShowCloseConfirm] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [autoCreateFailed, setAutoCreateFailed] = useState(false);
+
+  // Auto-create order and open AddItemsDialog when no open order exists
+  useEffect(() => {
+    if (isLoading || (order !== null && order !== undefined)) return;
+    if (autoCreateFailed) return;
+    if (createOrder.isPending) return;
+
+    const run = async () => {
+      try {
+        await createOrder.mutateAsync(table.id);
+        setShowAddItems(true);
+      } catch {
+        setAutoCreateFailed(true);
+        toast.error("Errore durante la creazione dell'ordine");
+      }
+    };
+    run();
+  }, [isLoading, order, table.id, autoCreateFailed, createOrder]);
 
   const handleCreateOrder = async () => {
     try {
       await createOrder.mutateAsync(table.id);
+      setAutoCreateFailed(false);
+      setShowAddItems(true);
       toast.success("Ordinazione creata");
     } catch {
       toast.error("Errore durante la creazione dell'ordine");
@@ -324,13 +355,19 @@ function OrderPanel({
       return sum + (menuItem?.price ?? 0) * Number(item.quantity);
     }, 0) ?? 0;
 
-  if (isLoading) {
+  // Show spinner while loading or auto-creating
+  if (isLoading || (!order && createOrder.isPending)) {
     return (
       <div
         data-ocid="waiter.order.loading_state"
-        className="flex-1 flex items-center justify-center"
+        className="flex-1 flex flex-col items-center justify-center gap-3"
       >
-        <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+        <Loader2 className="w-7 h-7 animate-spin text-primary" />
+        <p className="text-sm text-muted-foreground">
+          {createOrder.isPending
+            ? "Creazione ordinazione..."
+            : "Caricamento..."}
+        </p>
       </div>
     );
   }
@@ -338,6 +375,7 @@ function OrderPanel({
   return (
     <div className="flex flex-col h-full">
       {!order ? (
+        // Fallback: auto-create failed — show manual button
         <div className="flex-1 flex flex-col items-center justify-center gap-4 px-6">
           <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center">
             <ShoppingCart className="w-8 h-8 text-muted-foreground" />
@@ -538,112 +576,226 @@ function OrderPanel({
   );
 }
 
+function RoomTablesSection({
+  room,
+  reservations,
+  openOrderTableIds,
+  onSelectTable,
+}: {
+  room: Room;
+  reservations: Reservation[];
+  openOrderTableIds: Set<string>;
+  onSelectTable: (table: Table) => void;
+}) {
+  const { data: tables = [], isLoading } = useTablesByRoom(room.id);
+
+  if (isLoading) {
+    return (
+      <section>
+        <div className="flex items-center gap-3 mb-5">
+          <h2 className="font-display text-2xl font-semibold">{room.name}</h2>
+          <Separator className="flex-1" />
+        </div>
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+          {["c1", "c2", "c3"].map((c) => (
+            <Skeleton key={c} className="h-36" />
+          ))}
+        </div>
+      </section>
+    );
+  }
+
+  if (tables.length === 0) return null;
+
+  return (
+    <section>
+      <div className="flex items-center gap-3 mb-5">
+        <h2 className="font-display text-2xl font-semibold">{room.name}</h2>
+        <Separator className="flex-1" />
+        <span className="text-sm text-muted-foreground">
+          {tables.length} tavoli
+        </span>
+      </div>
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+        {tables.map((table, idx) => {
+          const status = getTableStatus(table, reservations);
+          const nextRes = getNextReservation(table, reservations);
+          const cfg = statusConfig[status];
+          const hasOpenOrder = openOrderTableIds.has(table.id.toString());
+          return (
+            <Card
+              key={table.id.toString()}
+              data-ocid={`waiter.table.item.${idx + 1}`}
+              onClick={() => onSelectTable(table)}
+              className="overflow-hidden border-border hover:shadow-md transition-shadow cursor-pointer"
+            >
+              <CardContent className="p-4 space-y-3">
+                <div className="flex items-start justify-between">
+                  <div
+                    className={`w-12 h-12 flex items-center justify-center text-sm font-bold text-foreground/80 ${
+                      table.shape === "round" ? "rounded-full" : "rounded-md"
+                    } bg-secondary`}
+                  >
+                    {table.tableLabel}
+                  </div>
+                  <span
+                    className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full ${cfg.bg} ${cfg.text}`}
+                  >
+                    <span className={`w-1.5 h-1.5 rounded-full ${cfg.dot}`} />
+                    {cfg.label}
+                  </span>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-xs text-muted-foreground flex items-center gap-1">
+                    <Users className="w-3 h-3" />
+                    {table.capacity.toString()} coperti
+                  </p>
+                  {nextRes && (
+                    <p className="text-xs text-muted-foreground flex items-center gap-1">
+                      <Clock className="w-3 h-3" />
+                      {nextRes.time} — {nextRes.customerName}
+                    </p>
+                  )}
+                  {hasOpenOrder && (
+                    <p className="text-xs font-medium text-amber-700 flex items-center gap-1">
+                      <ShoppingCart className="w-3 h-3" />
+                      Ordine aperto
+                    </p>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
 export default function WaiterPage() {
   const { data: rooms = [], isLoading: roomsLoading } = useRooms();
-  const { data: allTables = [], isLoading: tablesLoading } = useAllTables();
   const { data: openOrders = [] } = useOpenOrders();
   const { data: menuItems = [] } = useAllMenuItems();
+  const { data: reservations = [], isLoading: resLoading } =
+    useAllReservations();
   const [selectedTable, setSelectedTable] = useState<Table | null>(null);
+
+  const todayFormatted = new Date().toLocaleDateString("it-IT", {
+    weekday: "long",
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
+
+  const todayReservations = reservations.filter(
+    (r) => r.date === today && r.status !== "cancelled",
+  );
+  const seatedCount = todayReservations.filter(
+    (r) => r.status === "seated",
+  ).length;
+  const pendingCount = todayReservations.filter(
+    (r) => r.status === "pending" || r.status === "confirmed",
+  ).length;
 
   const openOrderTableIds = new Set(
     (openOrders as Order[]).map((o) => o.tableId.toString()),
   );
 
-  const tablesByRoom = rooms.reduce(
-    (acc, room) => {
-      acc[room.id.toString()] = (allTables as Table[]).filter(
-        (t) => t.roomId.toString() === room.id.toString(),
-      );
-      return acc;
-    },
-    {} as Record<string, Table[]>,
-  );
-
-  const isLoading = roomsLoading || tablesLoading;
-
   return (
-    <div data-ocid="waiter.page" className="min-h-screen bg-background">
-      <div className="px-6 py-8 border-b border-border">
-        <div className="flex items-center gap-3 mb-1">
-          <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
-            <ChefHat className="w-5 h-5 text-primary" />
-          </div>
-          <div>
-            <h1 className="font-display text-2xl font-bold text-foreground">
-              Cameriere
-            </h1>
-            <p className="text-sm text-muted-foreground">
-              Gestisci le ordinazioni dei tavoli
-            </p>
-          </div>
-        </div>
+    <div data-ocid="waiter.page" className="p-8 space-y-8 animate-fade-in">
+      {/* Header */}
+      <div className="flex flex-col gap-1">
+        <p className="text-sm font-medium text-muted-foreground capitalize">
+          {todayFormatted}
+        </p>
+        <h1 className="font-display text-4xl font-bold">Cameriere</h1>
       </div>
 
-      <div className="px-6 py-6">
-        {isLoading ? (
-          <div data-ocid="waiter.loading_state" className="space-y-6">
-            {[1, 2].map((i) => (
-              <div key={i}>
-                <Skeleton className="h-5 w-32 mb-3" />
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-                  {[1, 2, 3].map((j) => (
-                    <Skeleton key={j} className="h-24 rounded-xl" />
-                  ))}
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : (allTables as Table[]).length === 0 ? (
-          <div
-            data-ocid="waiter.empty_state"
-            className="flex flex-col items-center justify-center py-20 text-center"
+      {/* Stats row */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        {[
+          {
+            label: "Prenotazioni oggi",
+            value: todayReservations.length,
+            icon: CalendarDays,
+            color: "text-primary",
+          },
+          {
+            label: "Tavoli occupati",
+            value: seatedCount,
+            icon: Users,
+            color: "text-red-600",
+          },
+          {
+            label: "In attesa",
+            value: pendingCount,
+            icon: Clock,
+            color: "text-blue-600",
+          },
+          {
+            label: "Sale attive",
+            value: rooms.length,
+            icon: ChefHat,
+            color: "text-accent",
+          },
+        ].map((s, i) => (
+          <Card
+            key={s.label}
+            data-ocid={`waiter.stat.card.${i + 1}`}
+            className="border-border"
           >
-            <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mb-4">
-              <UtensilsCrossed className="w-8 h-8 text-muted-foreground" />
-            </div>
-            <p className="font-semibold text-foreground">
-              Nessun tavolo trovato
-            </p>
-            <p className="text-sm text-muted-foreground mt-1">
-              Aggiungi tavoli dalla sezione Piantina
-            </p>
-          </div>
-        ) : (
-          <div className="space-y-8">
-            {rooms.map((room: Room) => {
-              const roomTables = tablesByRoom[room.id.toString()] ?? [];
-              if (roomTables.length === 0) return null;
-              return (
-                <section key={room.id.toString()}>
-                  <div className="flex items-center gap-2 mb-3">
-                    <h2 className="font-display text-lg font-semibold text-foreground">
-                      {room.name}
-                    </h2>
-                    <Separator className="flex-1" />
-                    <span className="text-sm text-muted-foreground">
-                      {roomTables.length} tavoli
-                    </span>
-                  </div>
-                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-                    {roomTables.map((table, idx) => (
-                      <TableCard
-                        key={table.id.toString()}
-                        table={table}
-                        index={idx + 1}
-                        hasOpenOrder={openOrderTableIds.has(
-                          table.id.toString(),
-                        )}
-                        onClick={() => setSelectedTable(table)}
-                      />
-                    ))}
-                  </div>
-                </section>
-              );
-            })}
-          </div>
-        )}
+            <CardContent className="p-5 flex items-center gap-4">
+              <s.icon className={`w-8 h-8 ${s.color}`} />
+              <div>
+                <p className="text-2xl font-bold font-display">
+                  {resLoading || roomsLoading ? "—" : s.value}
+                </p>
+                <p className="text-xs text-muted-foreground">{s.label}</p>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
       </div>
 
+      {/* Tables by room */}
+      {roomsLoading ? (
+        <div data-ocid="waiter.loading_state" className="space-y-8">
+          {["r1", "r2"].map((k) => (
+            <div key={k}>
+              <Skeleton className="h-6 w-48 mb-4" />
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+                {["c1", "c2", "c3", "c4"].map((c) => (
+                  <Skeleton key={c} className="h-36" />
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : rooms.length === 0 ? (
+        <div data-ocid="waiter.empty_state" className="text-center py-16">
+          <UtensilsCrossed className="w-12 h-12 text-muted-foreground/40 mx-auto mb-3" />
+          <p className="font-display text-xl text-muted-foreground">
+            Nessun tavolo configurato
+          </p>
+          <p className="text-sm text-muted-foreground mt-1">
+            Aggiungi tavoli dalla sezione Piantina
+          </p>
+        </div>
+      ) : (
+        <div className="space-y-10">
+          {rooms.map((room: Room) => (
+            <RoomTablesSection
+              key={room.id.toString()}
+              room={room}
+              reservations={reservations}
+              openOrderTableIds={openOrderTableIds}
+              onSelectTable={setSelectedTable}
+            />
+          ))}
+        </div>
+      )}
+
+      {/* Order Sheet */}
       <Sheet
         open={selectedTable !== null}
         onOpenChange={(open) => !open && setSelectedTable(null)}
