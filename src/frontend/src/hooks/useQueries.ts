@@ -55,7 +55,7 @@ export function useAllTables() {
     queryKey: ["allTables"],
     queryFn: async () => {
       if (!actor) return [];
-      return (actor as any).getAllTables();
+      return actor.getAllTables();
     },
     enabled: !!actor && !isFetching,
   });

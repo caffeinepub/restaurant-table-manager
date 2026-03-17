@@ -148,6 +148,7 @@ export interface backendInterface {
     getAllMenuItems(): Promise<Array<MenuItem>>;
     getAllReservations(): Promise<Array<Reservation>>;
     getAllRooms(): Promise<Array<Room>>;
+    getAllTables(): Promise<Array<Table>>;
     getCallerUserProfile(): Promise<UserProfile | null>;
     getCallerUserRole(): Promise<UserRole>;
     getMenuItem(menuItemId: MenuItemId): Promise<MenuItem | null>;
@@ -334,6 +335,20 @@ export class Backend implements backendInterface {
             }
         } else {
             const result = await this.actor.getAllReservations();
+            return result;
+        }
+    }
+    async getAllTables(): Promise<Array<Table>> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.getAllTables();
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.getAllTables();
             return result;
         }
     }
