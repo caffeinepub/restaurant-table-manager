@@ -16,13 +16,13 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
-  CalendarDays,
-  ChefHat,
   Clock,
   Loader2,
   Minus,
   Plus,
+  Search,
   ShoppingCart,
   Trash2,
   Users,
@@ -114,18 +114,39 @@ function AddItemsDialog({
 }) {
   const [quantities, setQuantities] = useState<Record<string, number>>({});
   const [notes, setNotes] = useState<Record<string, string>>({});
+  const [search, setSearch] = useState("");
+  const [activeTab, setActiveTab] = useState("tutte");
   const addItem = useAddItemToOrder();
 
+  // Load sections from localStorage (same key used in MenuPage)
+  const savedSections: string[] = (() => {
+    try {
+      const raw = localStorage.getItem("menu_sections");
+      if (!raw) return [];
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  })();
+
   const availableItems = menuItems.filter((m) => m.available);
-  const byCategory = availableItems.reduce(
-    (acc, item) => {
-      const cat = item.category === "bibita" ? "Bibite" : "Cibo";
-      if (!acc[cat]) acc[cat] = [];
-      acc[cat].push(item);
-      return acc;
-    },
-    {} as Record<string, MenuItem[]>,
-  );
+
+  // Derive categories: use saved sections if available, else unique categories from items
+  const categories: string[] =
+    savedSections.length > 0
+      ? savedSections
+      : Array.from(
+          new Set(availableItems.map((m) => m.category).filter(Boolean)),
+        );
+
+  // Filter items by tab and search
+  const filteredItems = availableItems.filter((item) => {
+    const matchesTab = activeTab === "tutte" || item.category === activeTab;
+    const matchesSearch =
+      search === "" || item.name.toLowerCase().includes(search.toLowerCase());
+    return matchesTab && matchesSearch;
+  });
 
   const handleAdd = async () => {
     const entries = Object.entries(quantities).filter(([, qty]) => qty > 0);
@@ -147,6 +168,8 @@ function AddItemsDialog({
       toast.success("Articoli aggiunti all'ordine");
       setQuantities({});
       setNotes({});
+      setSearch("");
+      setActiveTab("tutte");
       onOpenChange(false);
     } catch {
       toast.error("Errore durante l'aggiunta degli articoli");
@@ -157,25 +180,71 @@ function AddItemsDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         data-ocid="waiter.menu.dialog"
-        className="max-w-lg max-h-[80vh] flex flex-col"
+        className="max-w-lg max-h-[85vh] flex flex-col gap-0 p-0"
       >
-        <DialogHeader>
+        <DialogHeader className="px-5 pt-5 pb-3">
           <DialogTitle className="font-display text-xl">
             Aggiungi al menu
           </DialogTitle>
         </DialogHeader>
-        <ScrollArea className="flex-1 pr-2">
-          {Object.entries(byCategory).map(([cat, items]) => (
-            <div key={cat} className="mb-4">
-              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">
-                {cat}
-              </p>
-              <div className="space-y-2">
-                {items.map((item, idx) => {
-                  const qty = quantities[item.id.toString()] ?? 0;
-                  return (
+
+        {/* Search */}
+        <div className="px-5 pb-3">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <Input
+              data-ocid="waiter.menu.search_input"
+              placeholder="Cerca articolo..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="pl-9 h-9"
+            />
+          </div>
+        </div>
+
+        {/* Category tabs */}
+        {categories.length > 0 && (
+          <div className="px-5 pb-3">
+            <Tabs value={activeTab} onValueChange={setActiveTab}>
+              <TabsList className="flex flex-wrap h-auto gap-1 bg-muted/50 p-1">
+                <TabsTrigger
+                  value="tutte"
+                  data-ocid="waiter.menu.tab"
+                  className="text-xs px-3 py-1"
+                >
+                  Tutte
+                </TabsTrigger>
+                {categories.map((cat) => (
+                  <TabsTrigger
+                    key={cat}
+                    value={cat}
+                    data-ocid="waiter.menu.tab"
+                    className="text-xs px-3 py-1"
+                  >
+                    {cat}
+                  </TabsTrigger>
+                ))}
+              </TabsList>
+            </Tabs>
+          </div>
+        )}
+
+        <Separator />
+
+        {/* Items list */}
+        <ScrollArea className="flex-1 px-5 py-3">
+          {filteredItems.length === 0 ? (
+            <div className="py-10 text-center text-muted-foreground text-sm">
+              <UtensilsCrossed className="w-8 h-8 mx-auto mb-2 opacity-30" />
+              Nessun articolo trovato
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {filteredItems.map((item, idx) => {
+                const qty = quantities[item.id.toString()] ?? 0;
+                return (
+                  <div key={item.id.toString()} className="space-y-1">
                     <div
-                      key={item.id.toString()}
                       data-ocid={`waiter.menu.item.${idx + 1}`}
                       className="flex items-center gap-3 p-3 rounded-lg border border-border bg-muted/30"
                     >
@@ -185,6 +254,11 @@ function AddItemsDialog({
                         </p>
                         <p className="text-xs text-muted-foreground">
                           €{item.price.toFixed(2)}
+                          {item.category && (
+                            <span className="ml-2 opacity-60">
+                              · {item.category}
+                            </span>
+                          )}
                         </p>
                       </div>
                       <div className="flex items-center gap-1">
@@ -222,39 +296,35 @@ function AddItemsDialog({
                         </button>
                       </div>
                     </div>
-                  );
-                })}
-              </div>
-              {items
-                .filter((item) => (quantities[item.id.toString()] ?? 0) > 0)
-                .map((item) => (
-                  <div key={`note-${item.id}`} className="mt-1 ml-1">
-                    <Input
-                      placeholder={`Note per ${item.name}...`}
-                      value={notes[item.id.toString()] ?? ""}
-                      onChange={(e) =>
-                        setNotes((prev) => ({
-                          ...prev,
-                          [item.id.toString()]: e.target.value,
-                        }))
-                      }
-                      className="text-xs h-8"
-                    />
+                    {qty > 0 && (
+                      <Input
+                        placeholder={`Note per ${item.name}...`}
+                        value={notes[item.id.toString()] ?? ""}
+                        onChange={(e) =>
+                          setNotes((prev) => ({
+                            ...prev,
+                            [item.id.toString()]: e.target.value,
+                          }))
+                        }
+                        className="text-xs h-8 ml-1"
+                      />
+                    )}
                   </div>
-                ))}
-            </div>
-          ))}
-          {availableItems.length === 0 && (
-            <div className="py-8 text-center text-muted-foreground text-sm">
-              Nessun articolo disponibile nel menu
+                );
+              })}
             </div>
           )}
         </ScrollArea>
-        <div className="pt-3 border-t border-border flex gap-2">
+
+        <Separator />
+
+        {/* Actions */}
+        <div className="px-5 py-4 flex gap-2">
           <Button
             variant="outline"
             className="flex-1"
             onClick={() => onOpenChange(false)}
+            data-ocid="waiter.menu.cancel_button"
           >
             Annulla
           </Button>
@@ -262,6 +332,7 @@ function AddItemsDialog({
             className="flex-1"
             onClick={handleAdd}
             disabled={addItem.isPending}
+            data-ocid="waiter.menu.submit_button"
           >
             {addItem.isPending ? (
               <Loader2 className="w-4 h-4 animate-spin mr-2" />
@@ -295,7 +366,7 @@ function OrderPanel({
 
   // Auto-create order and open AddItemsDialog when no open order exists
   useEffect(() => {
-    if (isLoading || (order !== null && order !== undefined)) return;
+    if (isLoading || order === undefined || order !== null) return;
     if (autoCreateFailed) return;
     if (createOrder.isPending) return;
 
@@ -356,7 +427,7 @@ function OrderPanel({
     }, 0) ?? 0;
 
   // Show spinner while loading or auto-creating
-  if (isLoading || (!order && createOrder.isPending)) {
+  if (isLoading || order === undefined || (!order && createOrder.isPending)) {
     return (
       <div
         data-ocid="waiter.order.loading_state"
@@ -676,8 +747,7 @@ export default function WaiterPage() {
   const { data: rooms = [], isLoading: roomsLoading } = useRooms();
   const { data: openOrders = [] } = useOpenOrders();
   const { data: menuItems = [] } = useAllMenuItems();
-  const { data: reservations = [], isLoading: resLoading } =
-    useAllReservations();
+  const { data: reservations = [] } = useAllReservations();
   const [selectedTable, setSelectedTable] = useState<Table | null>(null);
 
   const todayFormatted = new Date().toLocaleDateString("it-IT", {
@@ -686,16 +756,6 @@ export default function WaiterPage() {
     month: "long",
     day: "numeric",
   });
-
-  const todayReservations = reservations.filter(
-    (r) => r.date === today && r.status !== "cancelled",
-  );
-  const seatedCount = todayReservations.filter(
-    (r) => r.status === "seated",
-  ).length;
-  const pendingCount = todayReservations.filter(
-    (r) => r.status === "pending" || r.status === "confirmed",
-  ).length;
 
   const openOrderTableIds = new Set(
     (openOrders as Order[]).map((o) => o.tableId.toString()),
@@ -709,52 +769,6 @@ export default function WaiterPage() {
           {todayFormatted}
         </p>
         <h1 className="font-display text-4xl font-bold">Cameriere</h1>
-      </div>
-
-      {/* Stats row */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {[
-          {
-            label: "Prenotazioni oggi",
-            value: todayReservations.length,
-            icon: CalendarDays,
-            color: "text-primary",
-          },
-          {
-            label: "Tavoli occupati",
-            value: seatedCount,
-            icon: Users,
-            color: "text-red-600",
-          },
-          {
-            label: "In attesa",
-            value: pendingCount,
-            icon: Clock,
-            color: "text-blue-600",
-          },
-          {
-            label: "Sale attive",
-            value: rooms.length,
-            icon: ChefHat,
-            color: "text-accent",
-          },
-        ].map((s, i) => (
-          <Card
-            key={s.label}
-            data-ocid={`waiter.stat.card.${i + 1}`}
-            className="border-border"
-          >
-            <CardContent className="p-5 flex items-center gap-4">
-              <s.icon className={`w-8 h-8 ${s.color}`} />
-              <div>
-                <p className="text-2xl font-bold font-display">
-                  {resLoading || roomsLoading ? "—" : s.value}
-                </p>
-                <p className="text-xs text-muted-foreground">{s.label}</p>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
       </div>
 
       {/* Tables by room */}

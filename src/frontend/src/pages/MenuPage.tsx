@@ -34,16 +34,19 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import {
   Edit2,
+  Layers,
   Loader2,
   PlusCircle,
   Trash2,
   UtensilsCrossed,
+  X,
 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -55,11 +58,31 @@ import {
   useUpdateMenuItem,
 } from "../hooks/useQueries";
 
+const SECTIONS_KEY = "menu_sections";
+const DEFAULT_SECTIONS = ["Cibo", "Bibite"];
+
+function loadSections(): string[] {
+  try {
+    const raw = localStorage.getItem(SECTIONS_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+    }
+  } catch {
+    // ignore
+  }
+  return DEFAULT_SECTIONS;
+}
+
+function saveSections(sections: string[]) {
+  localStorage.setItem(SECTIONS_KEY, JSON.stringify(sections));
+}
+
 const emptyForm = {
   name: "",
   description: "",
   price: "",
-  category: "cibo",
+  category: "",
   available: true,
 };
 
@@ -71,14 +94,31 @@ export default function MenuPage() {
   const updateItem = useUpdateMenuItem();
   const deleteItem = useDeleteMenuItem();
 
+  const [sections, setSections] = useState<string[]>(loadSections);
+
+  // Item dialog
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<MenuItem | null>(null);
   const [form, setForm] = useState<FormState>(emptyForm);
   const [deleteTarget, setDeleteTarget] = useState<MenuItem | null>(null);
 
+  // Sections management dialog
+  const [sectionsDialogOpen, setSectionsDialogOpen] = useState(false);
+  const [newSectionName, setNewSectionName] = useState("");
+  const [renamingIdx, setRenamingIdx] = useState<number | null>(null);
+  const [renameValue, setRenameValue] = useState("");
+  const [deleteSectionTarget, setDeleteSectionTarget] = useState<string | null>(
+    null,
+  );
+
+  const updateSections = (next: string[]) => {
+    setSections(next);
+    saveSections(next);
+  };
+
   const openAdd = () => {
     setEditingItem(null);
-    setForm(emptyForm);
+    setForm({ ...emptyForm, category: sections[0] ?? "" });
     setDialogOpen(true);
   };
 
@@ -141,6 +181,52 @@ export default function MenuPage() {
     setDeleteTarget(null);
   };
 
+  // Section management handlers
+  const handleAddSection = () => {
+    const trimmed = newSectionName.trim();
+    if (!trimmed) return;
+    if (sections.some((s) => s.toLowerCase() === trimmed.toLowerCase())) {
+      toast.error("Sezione già esistente");
+      return;
+    }
+    updateSections([...sections, trimmed]);
+    setNewSectionName("");
+    toast.success(`Sezione "${trimmed}" aggiunta`);
+  };
+
+  const handleRenameSection = (idx: number) => {
+    const trimmed = renameValue.trim();
+    if (!trimmed) return;
+    if (
+      sections.some(
+        (s, i) => i !== idx && s.toLowerCase() === trimmed.toLowerCase(),
+      )
+    ) {
+      toast.error("Esiste già una sezione con questo nome");
+      return;
+    }
+    const next = sections.map((s, i) => (i === idx ? trimmed : s));
+    updateSections(next);
+    setRenamingIdx(null);
+    setRenameValue("");
+    toast.success("Sezione rinominata");
+  };
+
+  const confirmDeleteSection = (sectionName: string) => {
+    setDeleteSectionTarget(sectionName);
+  };
+
+  const handleDeleteSection = () => {
+    if (!deleteSectionTarget) return;
+    const next = sections.filter((s) => s !== deleteSectionTarget);
+    updateSections(next);
+    setDeleteSectionTarget(null);
+    toast.success(`Sezione "${deleteSectionTarget}" eliminata`);
+  };
+
+  const itemsInSection = (sectionName: string) =>
+    items.filter((i) => i.category.toLowerCase() === sectionName.toLowerCase());
+
   const isPending = createItem.isPending || updateItem.isPending;
 
   const renderItems = (filtered: MenuItem[]) => {
@@ -189,18 +275,11 @@ export default function MenuPage() {
                 <CardTitle className="text-base font-semibold leading-tight">
                   {item.name}
                 </CardTitle>
-                <Badge
-                  variant="outline"
-                  className={
-                    item.category === "cibo"
-                      ? "text-amber-700 border-amber-300 bg-amber-50 dark:bg-amber-950/30"
-                      : "text-sky-700 border-sky-300 bg-sky-50 dark:bg-sky-950/30"
-                  }
-                >
-                  {item.category === "cibo" ? "Cibo" : "Bibita"}
+                <Badge variant="outline" className="shrink-0">
+                  {item.category}
                 </Badge>
               </div>
-              <p className="text-xl font-display font-bold text-primary">
+              <p className="text-xl font-bold text-primary">
                 €{item.price.toFixed(2)}
               </p>
             </CardHeader>
@@ -260,34 +339,219 @@ export default function MenuPage() {
             Gestisci cibi e bibite del tuo ristorante
           </p>
         </div>
-        <Button onClick={openAdd} data-ocid="menu.primary_button">
-          <PlusCircle className="w-4 h-4 mr-2" /> Aggiungi voce
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            onClick={() => setSectionsDialogOpen(true)}
+            data-ocid="menu.sections.open_modal_button"
+          >
+            <Layers className="w-4 h-4 mr-2" /> Gestisci sezioni
+          </Button>
+          <Button onClick={openAdd} data-ocid="menu.primary_button">
+            <PlusCircle className="w-4 h-4 mr-2" /> Aggiungi voce
+          </Button>
+        </div>
       </div>
 
       <Tabs defaultValue="tutti">
-        <TabsList className="mb-6" data-ocid="menu.tab">
+        <TabsList className="mb-6 flex-wrap h-auto gap-1" data-ocid="menu.tab">
           <TabsTrigger value="tutti" data-ocid="menu.tutti.tab">
             Tutti ({items.length})
           </TabsTrigger>
-          <TabsTrigger value="cibi" data-ocid="menu.cibi.tab">
-            Cibi ({items.filter((i) => i.category === "cibo").length})
-          </TabsTrigger>
-          <TabsTrigger value="bibite" data-ocid="menu.bibite.tab">
-            Bibite ({items.filter((i) => i.category === "bibita").length})
-          </TabsTrigger>
+          {sections.map((section) => (
+            <TabsTrigger
+              key={section}
+              value={section}
+              data-ocid={"menu.section.tab"}
+            >
+              {section} ({itemsInSection(section).length})
+            </TabsTrigger>
+          ))}
         </TabsList>
 
         <TabsContent value="tutti">{renderItems(items)}</TabsContent>
-        <TabsContent value="cibi">
-          {renderItems(items.filter((i) => i.category === "cibo"))}
-        </TabsContent>
-        <TabsContent value="bibite">
-          {renderItems(items.filter((i) => i.category === "bibita"))}
-        </TabsContent>
+        {sections.map((section) => (
+          <TabsContent key={section} value={section}>
+            {renderItems(itemsInSection(section))}
+          </TabsContent>
+        ))}
       </Tabs>
 
-      {/* Add / Edit Dialog */}
+      {/* Sections Management Dialog */}
+      <Dialog open={sectionsDialogOpen} onOpenChange={setSectionsDialogOpen}>
+        <DialogContent className="sm:max-w-md" data-ocid="menu.sections.dialog">
+          <DialogHeader>
+            <DialogTitle>Gestisci sezioni</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            {/* Existing sections */}
+            <div className="space-y-2">
+              {sections.length === 0 && (
+                <p className="text-sm text-muted-foreground text-center py-4">
+                  Nessuna sezione. Aggiungine una sotto.
+                </p>
+              )}
+              {sections.map((section, idx) => {
+                const count = itemsInSection(section).length;
+                return (
+                  <div
+                    key={section}
+                    className="flex items-center gap-2 p-2 rounded-lg border border-border/60 bg-muted/30"
+                    data-ocid={`menu.sections.item.${idx + 1}`}
+                  >
+                    {renamingIdx === idx ? (
+                      <Input
+                        className="flex-1 h-7 text-sm"
+                        value={renameValue}
+                        onChange={(e) => setRenameValue(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") handleRenameSection(idx);
+                          if (e.key === "Escape") {
+                            setRenamingIdx(null);
+                            setRenameValue("");
+                          }
+                        }}
+                        autoFocus
+                        data-ocid="menu.sections.input"
+                      />
+                    ) : (
+                      <span className="flex-1 text-sm font-medium">
+                        {section}
+                        <span className="ml-2 text-xs text-muted-foreground">
+                          ({count} {count === 1 ? "voce" : "voci"})
+                        </span>
+                      </span>
+                    )}
+
+                    {renamingIdx === idx ? (
+                      <>
+                        <Button
+                          size="sm"
+                          variant="default"
+                          className="h-7 px-2 text-xs"
+                          onClick={() => handleRenameSection(idx)}
+                          data-ocid="menu.sections.save_button"
+                        >
+                          Salva
+                        </Button>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-7 w-7"
+                          onClick={() => {
+                            setRenamingIdx(null);
+                            setRenameValue("");
+                          }}
+                          data-ocid="menu.sections.cancel_button"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </Button>
+                      </>
+                    ) : (
+                      <>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-7 w-7"
+                          onClick={() => {
+                            setRenamingIdx(idx);
+                            setRenameValue(section);
+                          }}
+                          data-ocid={`menu.sections.edit_button.${idx + 1}`}
+                        >
+                          <Edit2 className="w-3.5 h-3.5" />
+                        </Button>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-7 w-7 text-destructive hover:text-destructive"
+                          onClick={() => confirmDeleteSection(section)}
+                          data-ocid={`menu.sections.delete_button.${idx + 1}`}
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </Button>
+                      </>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+
+            <Separator />
+
+            {/* Add new section */}
+            <div className="space-y-1.5">
+              <Label>Aggiungi nuova sezione</Label>
+              <div className="flex gap-2">
+                <Input
+                  value={newSectionName}
+                  onChange={(e) => setNewSectionName(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && handleAddSection()}
+                  placeholder="Es. Dessert, Vini, Antipasti…"
+                  data-ocid="menu.sections.new.input"
+                />
+                <Button
+                  onClick={handleAddSection}
+                  disabled={!newSectionName.trim()}
+                  data-ocid="menu.sections.add_button"
+                >
+                  <PlusCircle className="w-4 h-4" />
+                </Button>
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setSectionsDialogOpen(false)}
+              data-ocid="menu.sections.close_button"
+            >
+              Chiudi
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete section confirm */}
+      <AlertDialog
+        open={!!deleteSectionTarget}
+        onOpenChange={(o) => !o && setDeleteSectionTarget(null)}
+      >
+        <AlertDialogContent data-ocid="menu.sections.modal">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Elimina sezione</AlertDialogTitle>
+            <AlertDialogDescription>
+              Sei sicuro di voler eliminare la sezione{" "}
+              <strong>{deleteSectionTarget}</strong>?
+              {deleteSectionTarget &&
+                itemsInSection(deleteSectionTarget).length > 0 && (
+                  <span className="block mt-2 text-amber-600 dark:text-amber-400">
+                    ⚠️ Attenzione: {itemsInSection(deleteSectionTarget).length}{" "}
+                    {itemsInSection(deleteSectionTarget).length === 1
+                      ? "voce usa"
+                      : "voci usano"}{" "}
+                    questa sezione. Le voci non verranno eliminate ma la loro
+                    categoria resterà invariata.
+                  </span>
+                )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-ocid="menu.sections.cancel_button">
+              Annulla
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteSection}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              data-ocid="menu.sections.confirm_button"
+            >
+              Elimina
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Add / Edit Item Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="sm:max-w-md" data-ocid="menu.dialog">
           <DialogHeader>
@@ -344,11 +608,19 @@ export default function MenuPage() {
                   onValueChange={(v) => setForm((p) => ({ ...p, category: v }))}
                 >
                   <SelectTrigger data-ocid="menu.select">
-                    <SelectValue />
+                    <SelectValue placeholder="Seleziona sezione" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="cibo">Cibo</SelectItem>
-                    <SelectItem value="bibita">Bibita</SelectItem>
+                    {sections.map((s) => (
+                      <SelectItem key={s} value={s}>
+                        {s}
+                      </SelectItem>
+                    ))}
+                    {sections.length === 0 && (
+                      <SelectItem value="" disabled>
+                        Nessuna sezione
+                      </SelectItem>
+                    )}
                   </SelectContent>
                 </Select>
               </div>
@@ -389,7 +661,7 @@ export default function MenuPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Delete Confirm */}
+      {/* Delete Item Confirm */}
       <AlertDialog
         open={!!deleteTarget}
         onOpenChange={(o) => !o && setDeleteTarget(null)}
